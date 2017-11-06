@@ -222,11 +222,6 @@ exports.aggregateRatings = functions.firestore
 
 
 
-
-
-
-
-
 const _APPLICANTS_INDEX_NAME = "_APPLICANTS";
 
 //User's ratings aggregation
@@ -252,49 +247,56 @@ exports.manageNeedApplications = functions.firestore
     // Get a reference to the need's applicants collection
     var userNeedApplicantsRef = userNeedRef.collection(_APPLICANTS_INDEX_NAME);
     
+    const applicantName = event.data.get('username');
+    
     
     //debug
     console.log(1,'manageNeedApplications','userID='+userID
     ,'needID='+needID,'applicantID='+applicantID);
     
-    // Update aggregations in a transaction
-    return db.runTransaction(transaction => {
-        return transaction.get(userNeedApplicantsRef).then(snapshot => {
-            let nbApplications = 0;
-            let nbActiveApplications = 0;
+    return userRef.get()
+    .then(doc => {
+        if (!doc.exists) {
+            console.log(2,'#SNO','manageNeedApplications','userRef : No such document:','userID='+userID);
+        } else {
+            console.log(2,'Document data:', doc.data());
             
-            snapshot.forEach(doc => {
-                const isApplicationActive = doc.get('active');
-                
-                if(isApplicationActive === true)
-                    nbActiveApplications++;     
-                
-                nbApplications++;
-                
-                //debug
-                console.log(2,'manageNeedApplications','userID='+userID
-                ,'needID='+needID,'applicantID='+applicantID
-                ,'isApplicationActive='+isApplicationActive
-                ,'nbApplicants='+nbApplications,'nbActiveApplicants='+nbActiveApplications
-                ,doc.id, '=>', doc.data());
+            let registrationToken = doc.get('instanceIDToken');
+            
+            var payload = {
+                notification: {
+                    title: "Proposition de services",
+                    body: "Vous avez reçue une proposition de services pour votre besoin venant de @"+applicantName+".",
+                    clickAction : ".domain.components.needs.UserNeedActivity"
+                },
+                data: {
+                    _SuperUser: "FCM",
+                    NEED_ID : needID,
+                    NEED_TITLE : "TODO",
+                    APPLICANT_ID: applicantID,
+                    APPLICANT_NAME: applicantName
+                }
+            };
+            
+            var options = {
+                priority: "high",
+                timeToLive: 60 //TODO(uncomment in prod mod)    * 60 * 24  //24h bf expiration
+            };
+            
+            admin.messaging().sendToDevice(registrationToken, payload, options)
+            .then(function(response) {
+                console.log("Successfully sent message To {"+userID+"("+registrationToken+")} : response=", response);
+            })
+            .catch(function(error) {
+                console.log("Error sending message To {"+userID+"("+registrationToken+")} : error=", error);
             });
             
-            //debug
-            console.log(3,'manageNeedApplications','userID='+userID
-            ,'needID='+needID,'applicantID='+applicantID
-            ,'nbApplicants='+nbApplications,'nbActiveApplicants='+nbActiveApplications);
-            
-            // Update user rating infos
-            return transaction.update(userNeedRef, {
-                nbApplications: nbApplications,
-                nbActiveApplications: nbActiveApplications
-            });
-            
-        })
-        .catch(err => {
-            console.log('manageNeedApplications','userRatingsRef : Error getting need{'+needID+'} applications', err);
-        });       
+        }
+    })
+    .catch(err => {
+        console.log(2,'manageNeedApplications','userRef : Error getting document', err);
     });
+    
 });
 
 
@@ -305,7 +307,7 @@ exports.manageNeedApplications = functions.firestore
 
 // test func
 exports.hello = functions.https.onRequest((request, response) => {
-    const v = 6;
+    const v = 2;
     console.log("my log v="+v);
     response.send("Hello *_* ! v="+v);
 });
