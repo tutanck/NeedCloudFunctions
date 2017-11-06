@@ -98,6 +98,8 @@ exports.syncUserKeyword = functions.firestore
         //Debug
         console.log("Irrelevant to index: user/"+userID+"/_keyword/"+keywordID 
         ,"\n -->curr=",keyword ,"\n -->prev=",previous);
+        
+        //todo : remove from index
     }
     
     return null;
@@ -140,6 +142,8 @@ exports.syncUserNeed = functions.firestore
         //Debug
         console.log("Irrelevant to index: user/"+userID+"/_need/"+needID 
         ,"\n -->curr=",need ,"\n -->prev=",previous);
+        
+        //todo : remove from index
     }
     
     return null;
@@ -220,9 +224,88 @@ exports.aggregateRatings = functions.firestore
 
 
 
+
+
+
+const _APPLICANTS_INDEX_NAME = "_APPLICANTS";
+
+//User's ratings aggregation
+exports.manageNeedApplications = functions.firestore
+.document(USERS_INDEX_NAME+'/{userID}/'+_NEEDS_INDEX_NAME+'/{needID}/'+_APPLICANTS_INDEX_NAME+'/{applicantID}')
+.onWrite(event => {
+    
+    //userID
+    const userID =  event.params.userID;
+    
+    //needID
+    const needID =  event.params.needID;
+    
+    //applicantID
+    const applicantID =  event.params.applicantID;
+    
+    // Get a reference to the user that own the need
+    var userRef = db.collection(USERS_INDEX_NAME).doc(userID);
+    
+    // Get a reference to the user's need 
+    var userNeedRef = userRef.collection(_NEEDS_INDEX_NAME).doc(needID);
+    
+    // Get a reference to the need's applicants collection
+    var userNeedApplicantsRef = userNeedRef.collection(_APPLICANTS_INDEX_NAME);
+    
+    
+    //debug
+    console.log(1,'manageNeedApplications','userID='+userID
+    ,'needID='+needID,'applicantID='+applicantID);
+    
+    // Update aggregations in a transaction
+    return db.runTransaction(transaction => {
+        return transaction.get(userNeedApplicantsRef).then(snapshot => {
+            let nbApplications = 0;
+            let nbActiveApplications = 0;
+            
+            snapshot.forEach(doc => {
+                const isApplicationActive = doc.get('active');
+                
+                if(isApplicationActive === true)
+                    nbActiveApplications++;     
+                
+                nbApplications++;
+                
+                //debug
+                console.log(2,'manageNeedApplications','userID='+userID
+                ,'needID='+needID,'applicantID='+applicantID
+                ,'isApplicationActive='+isApplicationActive
+                ,'nbApplicants='+nbApplications,'nbActiveApplicants='+nbActiveApplications
+                ,doc.id, '=>', doc.data());
+            });
+            
+            //debug
+            console.log(3,'manageNeedApplications','userID='+userID
+            ,'needID='+needID,'applicantID='+applicantID
+            ,'nbApplicants='+nbApplications,'nbActiveApplicants='+nbActiveApplications);
+            
+            // Update user rating infos
+            return transaction.update(userNeedRef, {
+                nbApplications: nbApplications,
+                nbActiveApplications: nbActiveApplications
+            });
+            
+        })
+        .catch(err => {
+            console.log('manageNeedApplications','userRatingsRef : Error getting need{'+needID+'} applications', err);
+        });       
+    });
+});
+
+
+
+
+
+
+
 // test func
 exports.hello = functions.https.onRequest((request, response) => {
-    const v = 5;
+    const v = 6;
     console.log("my log v="+v);
     response.send("Hello *_* ! v="+v);
 });
