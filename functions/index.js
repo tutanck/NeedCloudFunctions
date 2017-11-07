@@ -247,12 +247,16 @@ exports.manageNeedApplications = functions.firestore
     // Get a reference to the need's applicants collection
     var userNeedApplicantsRef = userNeedRef.collection(_APPLICANTS_INDEX_NAME);
     
+    //Event's data values
     const applicantName = event.data.get('username');
+
+    const needTitle = event.data.get('needTitle');
     
     
     //debug
     console.log(1,'manageNeedApplications','userID='+userID
-    ,'needID='+needID,'applicantID='+applicantID);
+    ,'needID='+needID,'applicantID='+applicantID
+    ,'needTitle='+needTitle,'applicantName='+applicantName);
     
     return userRef.get()
     .then(doc => {
@@ -266,13 +270,13 @@ exports.manageNeedApplications = functions.firestore
             var payload = {
                 notification: {
                     title: "Proposition de services",
-                    body: "Vous avez reçue une proposition de services pour votre besoin venant de @"+applicantName+".",
+                    body: "Vous avez reçue une proposition de services pour votre besoin '"+needTitle+"' venant de @"+applicantName+".",
                     clickAction : ".domain.components.needs.UserNeedActivity"
                 },
                 data: {
                     _SuperUser: "FCM",
                     NEED_ID : needID,
-                    NEED_TITLE : "TODO",
+                    NEED_TITLE : needTitle,
                     APPLICANT_ID: applicantID,
                     APPLICANT_NAME: applicantName
                 }
@@ -285,10 +289,10 @@ exports.manageNeedApplications = functions.firestore
             
             admin.messaging().sendToDevice(registrationToken, payload, options)
             .then(function(response) {
-                console.log("Successfully sent message To {"+userID+"("+registrationToken+")} : response=", response);
+                console.log(3,"Successfully sent message To {"+userID+"("+registrationToken+")} : response=", response);
             })
             .catch(function(error) {
-                console.log("Error sending message To {"+userID+"("+registrationToken+")} : error=", error);
+                console.log(3,"Error sending message To {"+userID+"("+registrationToken+")} : error=", error);
             });
             
         }
@@ -307,7 +311,7 @@ exports.manageNeedApplications = functions.firestore
 
 // test func
 exports.hello = functions.https.onRequest((request, response) => {
-    const v = 2;
+    const v = 3;
     console.log("my log v="+v);
     response.send("Hello *_* ! v="+v);
 });
