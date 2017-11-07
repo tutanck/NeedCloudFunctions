@@ -298,7 +298,83 @@ exports.manageNeedApplications = functions.firestore
         }
     })
     .catch(err => {
-        console.log(2,'manageNeedApplications','userRef : Error getting document', err);
+        console.log(2,'manageNeedApplications','userRef : Error getting document','userID='+userID, err);
+    });
+    
+});
+
+
+
+
+
+
+
+
+
+const MESSAGES_INDEX_NAME = "MESSAGES";
+
+//User's ratings aggregation
+exports.messagesNotifications = functions.firestore
+.document(MESSAGES_INDEX_NAME+'/{messageID}')
+.onCreate(event => {
+
+    //messageID
+    const messageID =  event.params.messageID;
+
+    //fromID
+    const fromID =  event.data.get('from');
+
+    //toID
+    const toID =  event.data.get('to');
+
+    //message
+    const message =  event.data.get('message');
+    
+    // Get a reference to the message's recipient
+    var toRef = db.collection(USERS_INDEX_NAME).doc(toID);
+    
+    
+    //debug
+    console.log(1,'messagesNotifications','messageID='+messageID,'fromID='+fromID,'toID='+toID,'message='+message);
+    
+    return toRef.get()
+    .then(doc => {
+        if (!doc.exists) {
+            console.log(2,'#SNO','messagesNotifications','userRef : No such document:','userID='+toID);
+        } else {
+            console.log(2,'Document data:', doc.data());
+            
+            let registrationToken = doc.get('instanceIDToken');
+            
+            var payload = {
+                notification: {
+                    title: "Message de @"+doc.get('username'),
+                    body: message,
+                    clickAction : ".domain.components.messages.MessagesActivity"
+                },
+                data: {
+                    _SuperUser: "FCM",
+                    CONTACT_ID : fromID
+                }
+            };
+            
+            var options = {
+                priority: "high",
+                timeToLive: 60 //TODO(uncomment in prod mod)    * 60 * 24  //24h bf expiration
+            };
+            
+            admin.messaging().sendToDevice(registrationToken, payload, options)
+            .then(function(response) {
+                console.log(3,"Successfully sent message To {"+toID+"("+registrationToken+")} : response=", response);
+            })
+            .catch(function(error) {
+                console.log(3,"Error sending message To {"+toID+"("+registrationToken+")} : error=", error);
+            });
+            
+        }
+    })
+    .catch(err => {
+        console.log(2,'messagesNotifications','userRef : Error getting document','userID='+toID, err);
     });
     
 });
@@ -311,7 +387,7 @@ exports.manageNeedApplications = functions.firestore
 
 // test func
 exports.hello = functions.https.onRequest((request, response) => {
-    const v = 3;
+    const v = 4;
     console.log("my log v="+v);
     response.send("Hello *_* ! v="+v);
 });
