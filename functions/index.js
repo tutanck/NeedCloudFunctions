@@ -348,7 +348,7 @@ exports.messagesNotifications = functions.firestore
             
             var payload = {
                 notification: {
-                    title: "Message de @"+doc.get('username'),
+                    title: "Nouveau message",
                     body: message,
                     clickAction : ".domain.components.messages.MessagesActivity"
                 },
