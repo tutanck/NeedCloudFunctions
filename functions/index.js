@@ -249,8 +249,8 @@ exports.manageNeedApplications = functions.firestore
     
     //Event's data values
     const applicantName = event.data.get('username');
-
     const needTitle = event.data.get('needTitle');
+    const queryString = event.data.get('queryString');
     
     
     //debug
@@ -277,6 +277,7 @@ exports.manageNeedApplications = functions.firestore
                     _SuperUser: "FCM",
                     NEED_ID : needID,
                     NEED_TITLE : needTitle,
+                    QUERY_STRING : queryString,
                     APPLICANT_ID: applicantID,
                     APPLICANT_NAME: applicantName
                 }
@@ -387,7 +388,7 @@ exports.messagesNotifications = functions.firestore
 
 // test func
 exports.hello = functions.https.onRequest((request, response) => {
-    const v = 4;
+    const v = 5;
     console.log("my log v="+v);
     response.send("Hello *_* ! v="+v);
 });
