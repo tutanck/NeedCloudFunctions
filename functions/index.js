@@ -257,7 +257,7 @@ exports.manageNeedApplications = functions.firestore
         const aTab = [];
         
         snapshot.forEach(doc => {
-            console.log(2,doc.id, '=>', doc.data());//debug
+            console.log(4,doc.id, '=>', doc.data());//debug
             if(doc.get('active'))
                 aTab.push(doc.id);
         });    
@@ -269,17 +269,17 @@ exports.manageNeedApplications = functions.firestore
         };
         
         //Debug
-        console.log(2,"Will attempt to re-index:",userNeedApplicantsRef.path,"\n -->applicants=",applicants);
+        console.log(4,"Will attempt to re-index:",userNeedApplicantsRef.path,"\n -->applicants=",applicants);
         
         // Write to the algolia index
         const index = client.initIndex(_NEEDS_INDEX_NAME);
         return index.partialUpdateObject(applicants, function(err, content) {
-            console.log(2,"manageNeedApplications::partialUpdateObject(",applicants,"):",content,err);
+            console.log(4,"manageNeedApplications::partialUpdateObject(",applicants,"):",content,err);
         });
         
     })
     .catch(err => {
-        console.log(2,'manageNeedApplications','userNeedApplicantsRef : Error getting',userNeedApplicantsRef.path, err);
+        console.log(4,'manageNeedApplications','userNeedApplicantsRef : Error getting',userNeedApplicantsRef.path, err);
     });
 
 
