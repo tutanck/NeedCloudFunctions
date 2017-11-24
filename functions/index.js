@@ -111,7 +111,7 @@ exports.syncUserKeywords = functions.firestore
                 kTab.push(doc.get('keyword'));
         });    
         
-        //new keywords-object for re-indexing
+        //new keywords-object for index update
         const keywords = {
             keywords: kTab,
             objectID: userID
@@ -128,7 +128,7 @@ exports.syncUserKeywords = functions.firestore
         
     })
     .catch(err => {
-        console.log(2,'syncUserKeywords','userRef : Error getting document','userID=',userID, err);
+        console.log(2,'syncUserKeywords','userKeywordsRef : Error getting',userKeywordsRef.path, err);
     });
     
     return null;
@@ -214,75 +214,6 @@ exports.syncUserNeed = functions.firestore
 
 /*DB TRIGGERS*/ 
 
-
-const _RATINGS_INDEX_NAME = "_RATINGS";
-
-//User's ratings aggregation
-exports.aggregateRatings = functions.firestore
-.document(USERS_INDEX_NAME+'/{userID}/'+_RATINGS_INDEX_NAME+'/{ratingId}')
-.onWrite(event => {
-    
-    //userID
-    const userID =  event.params.userID;
-    
-    //keywordID
-    const ratingId =  event.params.ratingId;
-    
-    // Get value of the newly added rating
-    var ratingVal = event.data.get('rating');
-    
-    // Get a reference to the rated user
-    var userRef = db.collection(USERS_INDEX_NAME).doc(userID);
-    
-    // Get a reference to the rated user ratings collection
-    var userRatingsRef = userRef.collection(_RATINGS_INDEX_NAME) ;
-    
-    //debug
-    console.log(1,'aggregateRatings','userID='+userID
-    ,'ratingId='+ratingId,'ratingVal='+ratingVal);
-    
-    // Update aggregations in a transaction
-    return db.runTransaction(transaction => {
-        return transaction.get(userRatingsRef).then(snapshot => {
-            let nbVoters = 0;
-            let ratingsSum = 0;
-            
-            snapshot.forEach(doc => {
-                ratingsSum += doc.get('rating');
-                nbVoters++;      
-                
-                //debug
-                console.log(2,'aggregateRatings','userID='+userID
-                ,'ratingId='+ratingId,'ratingVal='+ratingVal
-                ,'ratingsSum='+ratingsSum,'nbVoters='+nbVoters
-                ,doc.id, '=>', doc.data());
-            });
-            
-            let avgRating = nbVoters == 0 ? 0 : ratingsSum / nbVoters;
-            
-            //debug
-            console.log(3,'aggregateRatings','userID='+userID
-            ,'ratingId='+ratingId,'ratingVal='+ratingVal
-            ,"avgRating="+avgRating,"nbVoters="+nbVoters);
-            
-            // Update user rating infos
-            return transaction.update(userRef, {
-                avgRating: avgRating,
-                nbVoters: nbVoters
-            });
-            
-        })
-        .catch(err => {
-            console.log('aggregateRatings','userRatingsRef : Error getting user{'+userID+'} ratings', err);
-        });       
-    });
-});
-
-
-
-
-
-
 const _APPLICANTS_INDEX_NAME = "_APPLICANTS";
 
 //User's ratings aggregation
@@ -318,6 +249,40 @@ exports.manageNeedApplications = functions.firestore
     console.log(1,'manageNeedApplications','userID='+userID
     ,'needID='+needID,'applicantID='+applicantID
     ,'needTitle='+needTitle,'applicantName='+applicantName);
+      
+    
+    
+    //Get all applicants for indexing
+    userNeedApplicantsRef.get().then(snapshot => {
+        const aTab = [];
+        
+        snapshot.forEach(doc => {
+            console.log(2,doc.id, '=>', doc.data());//debug
+            if(doc.get('active'))
+                aTab.push(doc.id);
+        });    
+
+        //new applicants-object for index update
+        const applicants = {
+            applicants: aTab,
+            objectID: needID
+        };
+        
+        //Debug
+        console.log(2,"Will attempt to re-index:",userNeedApplicantsRef.path,"\n -->applicants=",applicants);
+        
+        // Write to the algolia index
+        const index = client.initIndex(_NEEDS_INDEX_NAME);
+        return index.partialUpdateObject(applicants, function(err, content) {
+            console.log(2,"manageNeedApplications::partialUpdateObject(",applicants,"):",content,err);
+        });
+        
+    })
+    .catch(err => {
+        console.log(2,'manageNeedApplications','userNeedApplicantsRef : Error getting',userNeedApplicantsRef.path, err);
+    });
+
+
     
     return userRef.get()
     .then(doc => {
@@ -364,6 +329,8 @@ exports.manageNeedApplications = functions.firestore
     });
     
 });
+
+
 
 
 
@@ -445,6 +412,73 @@ exports.messagesNotifications = functions.firestore
 
 
 
+
+
+
+
+
+const _RATINGS_INDEX_NAME = "_RATINGS";
+
+//User's ratings aggregation
+exports.aggregateRatings = functions.firestore
+.document(USERS_INDEX_NAME+'/{userID}/'+_RATINGS_INDEX_NAME+'/{ratingId}')
+.onWrite(event => {
+    
+    //userID
+    const userID =  event.params.userID;
+    
+    //keywordID
+    const ratingId =  event.params.ratingId;
+    
+    // Get value of the newly added rating
+    var ratingVal = event.data.get('rating');
+    
+    // Get a reference to the rated user
+    var userRef = db.collection(USERS_INDEX_NAME).doc(userID);
+    
+    // Get a reference to the rated user ratings collection
+    var userRatingsRef = userRef.collection(_RATINGS_INDEX_NAME) ;
+    
+    //debug
+    console.log(1,'aggregateRatings','userID='+userID
+    ,'ratingId='+ratingId,'ratingVal='+ratingVal);
+    
+    // Update aggregations in a transaction
+    return db.runTransaction(transaction => {
+        return transaction.get(userRatingsRef).then(snapshot => {
+            let nbVoters = 0;
+            let ratingsSum = 0;
+            
+            snapshot.forEach(doc => {
+                ratingsSum += doc.get('rating');
+                nbVoters++;      
+                
+                //debug
+                console.log(2,'aggregateRatings','userID='+userID
+                ,'ratingId='+ratingId,'ratingVal='+ratingVal
+                ,'ratingsSum='+ratingsSum,'nbVoters='+nbVoters
+                ,doc.id, '=>', doc.data());
+            });
+            
+            let avgRating = nbVoters == 0 ? 0 : ratingsSum / nbVoters;
+            
+            //debug
+            console.log(3,'aggregateRatings','userID='+userID
+            ,'ratingId='+ratingId,'ratingVal='+ratingVal
+            ,"avgRating="+avgRating,"nbVoters="+nbVoters);
+            
+            // Update user rating infos
+            return transaction.update(userRef, {
+                avgRating: avgRating,
+                nbVoters: nbVoters
+            });
+            
+        })
+        .catch(err => {
+            console.log('aggregateRatings','userRatingsRef : Error getting user{'+userID+'} ratings', err);
+        });       
+    });
+});
 
 
 /*TOOLS*/
