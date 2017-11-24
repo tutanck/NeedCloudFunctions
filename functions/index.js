@@ -43,8 +43,9 @@ exports.syncUser = functions.firestore
     
     //remove from index offline users
     if(user.availability===-1) {
-        //todo remove from index
-        return null;
+        return index.deleteObject(userID, function(err, content) {
+            console.log(2,"syncUser::deleteObject(",userID,"):",content,err);
+        });
     }
     
     //Document minimization 
@@ -54,16 +55,18 @@ exports.syncUser = functions.firestore
     delete user.instanceIDToken;
     delete user.type;   
     
-    
     // Add an "objectID" field which Algolia requires
     user.objectID = userID;
     
     //Debug
-    console.log("Will attempt to re-index: user/"+userID ,"\n -->curr=",user ,"\n -->prev=",previous);
+    console.log(1,"Will attempt to re-index: user/",userID ,"\n -->curr=",user ,"\n -->prev=",previous);
     
     // Write to the algolia index
     const index = client.initIndex(USERS_INDEX_NAME);
-    //return index.saveObject(user);
+    return index.saveObject(user, function(err, content) {
+        console.log(2,"syncUser::saveObject(",user,"):",content,err);
+    });
+    
     return null;
 });
 
@@ -104,22 +107,28 @@ exports.syncUserKeywords = functions.firestore
         
         snapshot.forEach(doc => {
             //console.log(2,doc.id, '=>', doc.data());//debug
-            
             if(!doc.get('deleted') && doc.get('active'))
                 kTab.push(doc.get('keyword'));
-            
         });    
         
+        //new keywords-object for re-indexing
+        const keywords = {
+            keywords: kTab,
+            objectID: userID
+        };
+        
         //Debug
-        console.log(2,"Will attempt to re-index:",userKeywordsRef.path,"\n -->kTab=",kTab);
+        console.log(2,"Will attempt to re-index:",userKeywordsRef.path,"\n -->keywords=",keywords);
         
         // Write to the algolia index
         const index = client.initIndex(_KEYWORDS_INDEX_NAME);
-        //return index.saveObject(kTab);
+        return index.partialUpdateObject(keywords, function(err, content) {
+            console.log(2,"syncUserKeywords::partialUpdateObject(",keywords,"):",content,err);
+        });
         
     })
     .catch(err => {
-        console.log(2,'syncUserKeywords','userRef : Error getting document','userID='+userID, err);
+        console.log(2,'syncUserKeywords','userRef : Error getting document','userID=',userID, err);
     });
     
     return null;
@@ -175,14 +184,19 @@ exports.syncUserNeed = functions.firestore
         
         // Write to the algolia index
         const index = client.initIndex(_NEEDS_INDEX_NAME);
-        //return index.saveObject(need);
+        return index.saveObject(need, function(err, content) {
+            console.log(2,"syncUserNeed::saveObject(",need,"):",content,err);
+        });
         
     }else{
         //Debug
         console.log(1,"Irrelevant to index:",userNeedRef.path
         ,"\n -->curr=",need ,"\n -->prev=",previous);
         
-        //todo : remove from index
+        // Remove from the algolia index
+        return index.deleteObject(needID, function(err, content) {
+            console.log(2,"syncUserNeed::deleteObject(",needID,"):",content,err);
+        });
     }
     
     return null;
